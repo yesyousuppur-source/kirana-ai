@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#10B981" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="application-name" content="Kirana AI" />
+
+<!-- PWA manifest (required for APK) -->
+<link rel="manifest" href="manifest.json" />
+
+<!-- App icons -->
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+
+<title>किराना AI — Dashboard</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --green:#10B981;
+    --green-dark:#059669;
+    --yellow:#F59E0B;
+    --red:#EF4444;
+    --blue:#3B82F6;
+    --ink:#0F172A;
+    --muted:#64748B;
+    --line:#E5E7EB;
+    --wa-bubble:#DCF8C6;
+    --wa-in:#FFFFFF;
+    /* Material elevation shadows */
+    --elev-1: 0 1px 2px rgba(0,0,0,.14), 0 1px 3px rgba(0,0,0,.12);
+    --elev-2: 0 2px 4px rgba(0,0,0,.14), 0 3px 6px rgba(0,0,0,.10);
+    --elev-3: 0 4px 8px rgba(0,0,0,.14), 0 6px 10px rgba(0,0,0,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%; overflow:hidden;}
+  body{
+    font-family:'Roboto',sans-serif; color:var(--ink);
+    background:#fff;
+    min-height:100vh; min-height:100dvh;
+    overscroll-behavior:none;
+    touch-action: manipulation;
+  }
+  .hi{font-family:'Noto Sans Devanagari','Roboto',sans-serif;}
+
+  .app{
+    display:flex; flex-direction:column;
+    height:100vh; height:100dvh;
+    width:100%; max-width:640px;
+    margin:0 auto; background:#fff;
+    position:relative; overflow:hidden;
+  }
+
+  /* ---------- Header (Material AppBar style) ---------- */
+  header.app-header{
+    background:var(--green); color:#fff;
+    height: 60px;
+    padding: 0 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:20;
+    box-shadow: var(--elev-2);
+  }
+  .logo{display:flex; align-items:center; gap:10px; min-width:0;}
+  .logo .mark{
+    width:38px;height:38px;border-radius:10px;background:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800; color:var(--green); font-size:17px;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.06); flex:0 0 38px;
+  }
+  .logo .name{font-weight:700; font-size:18px; letter-spacing:.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .logo .name small{display:block; font-size:11px; font-weight:500; opacity:.9; margin-top:-2px; white-space:nowrap;}
+  .hdr-right{display:flex; align-items:center; gap:10px; flex-shrink:0;}
+  .icon-btn{
+    width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.14);
+    display:flex;align-items:center;justify-content:center; position:relative;
+    cursor:pointer; overflow:hidden;
+  }
+  .icon-btn .dot{
+    position:absolute; top:8px; right:8px; width:9px;height:9px;border-radius:50%;
+    background:var(--red); border:1.5px solid var(--green);
+  }
+  .avatar{
+    width:40px;height:40px;border-radius:50%;
+    background:linear-gradient(135deg,#FDE68A,#F59E0B);
+    display:flex;align-items:center;justify-content:center;
+    color:#78350F; font-weight:800; font-size:14px;
+    border:2px solid rgba(255,255,255,.35); cursor:pointer;
+  }
+
+  /* Material ripple effect */
+  .ripple{position:relative; overflow:hidden;}
+  .ripple::after{
+    content:""; position:absolute; inset:0;
+    background: radial-gradient(circle at var(--rx,50%) var(--ry,50%), rgba(255,255,255,.45), transparent 60%);
+    opacity:0; transition: opacity .4s ease;
+    pointer-events:none;
+  }
+  .ripple:active::after{opacity:1; transition: opacity 0s;}
+
+  /* ---------- Main ---------- */
+  main{
+    flex:1; display:flex; min-height:0;
+    background:#F8FAFC; padding:10px 10px 0; gap:8px; overflow:hidden;
+  }
+  .col-left{
+    width:40%; display:flex; flex-direction:column; gap:8px;
+    overflow-y:auto; padding-bottom:10px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .col-right{ width:60%; display:flex; flex-direction:column; min-width:0; }
+  .col-left::-webkit-scrollbar, .chat-list::-webkit-scrollbar{width:0; height:0;}
+  .col-left, .chat-list{scrollbar-width:none;}
+
+  /* ---------- Cards (Material Card) ---------- */
+  .card{
+    background:#fff; border-radius:12px; padding:10px;
+    box-shadow: var(--elev-1);
+    position:relative; overflow:hidden;
+    animation: rise .5s ease both;
+    border-left: 4px solid transparent;
+  }
+  .card.green{border-left-color:var(--green); background:linear-gradient(180deg,#F0FDF4 0%, #fff 50%);}
+  .card.yellow{border-left-color:var(--yellow); background:linear-gradient(180deg,#FFFBEB 0%, #fff 50%);}
+  .card.blue{border-left-color:var(--blue); background:linear-gradient(180deg,#EFF6FF 0%, #fff 50%);}
+
+  .card .label{
+    font-size:10px; font-weight:600; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.5px;
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  }
+  .card .label .pill{
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 7px; border-radius:999px; font-size:9px; font-weight:700;
+  }
+  .card.green .pill{background:#D1FAE5; color:#065F46;}
+  .card.yellow .pill{background:#FEF3C7; color:#92400E;}
+  .card.blue  .pill{background:#DBEAFE; color:#1E40AF;}
+
+  .big{font-family:'Noto Sans Devanagari',sans-serif; font-weight:800; line-height:1; color:var(--ink); margin-top:6px; letter-spacing:-.5px;}
+  .big.xl{font-size:34px;}
+  .big.sub{font-size:14px; font-weight:600; color:var(--muted); margin-top:2px;}
+  .amount{font-family:'Roboto',sans-serif; font-weight:900; color:var(--green); font-size:22px; margin-top:4px;}
+  .amount .trend{
+    display:inline-flex; align-items:center; gap:2px;
+    font-size:10px; font-weight:700; color:var(--green-dark);
+    background:#D1FAE5; padding:2px 5px; border-radius:6px; vertical-align:middle; margin-left:4px;
+  }
+
+  /* Material Button */
+  .btn{
+    width:100%; border:0; cursor:pointer;
+    border-radius:12px; padding:11px 12px;
+    font-family:'Noto Sans Devanagari',sans-serif; font-weight:700; font-size:13px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    box-shadow: var(--elev-1);
+    transition: transform .12s ease, box-shadow .15s ease, background .15s ease;
+    margin-top:10px;
+    position:relative; overflow:hidden;
+    min-height: 44px;  /* Material touch target */
+  }
+  .btn:active{transform:translateY(1px); box-shadow: var(--elev-2);}
+  .btn-green{background:var(--green); color:#fff;}
+  .btn-green:active{background:var(--green-dark);}
+  .btn-ghost{background:#fff; color:var(--ink); border:1.5px solid var(--line);}
+
+  .red-dot{
+    display:inline-block; width:8px;height:8px;border-radius:50%;
+    background:var(--red); margin-right:6px; position:relative;
+    animation: pulse 1.6s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(239,68,68,.55);}
+    100%{box-shadow:0 0 0 8px rgba(239,68,68,0);}
+  }
+
+  .cust{display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px dashed #E2E8F0; min-height:40px;}
+  .cust:last-child{border:0;}
+  .cust .ava{
+    width:28px;height:28px;border-radius:50%; flex:0 0 28px;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800; font-size:11px; color:#fff;
+    box-shadow: var(--elev-1);
+  }
+  .cust .ava.a{background:linear-gradient(135deg,#60A5FA,#2563EB);}
+  .cust .ava.b{background:linear-gradient(135deg,#F472B6,#DB2777);}
+  .cust .ava.c{background:linear-gradient(135deg,#34D399,#059669);}
+  .cust .nm{font-family:'Noto Sans Devanagari',sans-serif; font-size:12px; font-weight:600; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .cust .od{font-size:10px; color:var(--muted); margin-left:auto; font-weight:600; flex-shrink:0;}
+  .cust .od b{color:var(--blue); font-weight:800;}
+
+  /* ---------- Chat (WhatsApp style) ---------- */
+  .chat-header{ display:flex; align-items:center; justify-content:space-between; padding:4px 4px 6px; }
+  .chat-header h3{
+    font-family:'Noto Sans Devanagari',sans-serif; font-size:13px; font-weight:700; color:var(--ink);
+    display:flex; align-items:center; gap:6px;
+  }
+  .chat-header h3 .wa{
+    width:20px;height:20px; border-radius:50%; background:#25D366;
+    display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;
+    box-shadow: var(--elev-1);
+  }
+  .chat-header .all{font-size:10px; color:var(--green-dark); font-weight:700; cursor:pointer;}
+
+  .chat-list{
+    flex:1; overflow-y:auto;
+    background: linear-gradient(180deg,#F7F4EF 0%, #EFEBE3 100%);
+    background-image:
+      radial-gradient(#d8d1c4 .7px, transparent .7px),
+      radial-gradient(#d8d1c4 .7px, transparent .7px);
+    background-size: 14px 14px, 14px 14px;
+    background-position: 0 0, 7px 7px;
+    border-radius:12px; padding:10px 8px 14px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .msg{
+    max-width:90%; padding:8px 10px 18px;
+    border-radius:10px; position:relative; margin-bottom:8px;
+    font-family:'Noto Sans Devanagari',sans-serif;
+    font-size:12.5px; color:#111827; line-height:1.35;
+    box-shadow: 0 1px 1px rgba(0,0,0,.08);
+    animation: slideIn .45s cubic-bezier(.22,.9,.32,1.1) both;
+    word-wrap: break-word;
+  }
+  .msg .name{ display:block; font-size:10.5px; font-weight:800; margin-bottom:2px; }
+  .msg .name.n1{color:#D946A3;} .msg .name.n2{color:#4F46E5;}
+  .msg .name.n3{color:#EA580C;} .msg .name.n4{color:#0F766E;}
+  .msg .name.n5{color:#B45309;}
+
+  .msg .tag{
+    display:inline-flex; align-items:center; gap:3px;
+    font-family:'Roboto',sans-serif; font-size:9.5px; font-weight:700;
+    padding:2px 6px; border-radius:999px; margin-left:6px; vertical-align:middle;
+  }
+  .tag.order{background:#D1FAE5; color:#065F46;}
+  .tag.enq{background:#DBEAFE; color:#1E40AF;}
+  .tag.pay{background:#FEF3C7; color:#92400E;}
+  .tag.urg{background:#FEE2E2; color:#991B1B;}
+  .tag i{width:6px;height:6px;border-radius:50%;}
+  .tag.order i{background:#10B981;} .tag.enq i{background:#3B82F6;}
+  .tag.pay i{background:#F59E0B;} .tag.urg i{background:#EF4444;}
+
+  .msg .time{
+    position:absolute; right:8px; bottom:4px;
+    font-family:'Roboto',sans-serif; font-size:9.5px; color:#6B7280;
+    display:flex; align-items:center; gap:2px;
+  }
+  .tick{color:#3B82F6; font-weight:900;}
+  .in { background:var(--wa-in); border-top-left-radius:2px; }
+  .out{ background:var(--wa-bubble); border-top-right-radius:2px; margin-left:auto; }
+
+  .day{ display:flex; justify-content:center; margin:4px 0 10px; }
+  .day span{
+    background:rgba(255,255,255,.85); color:#4B5563;
+    font-size:10px; font-weight:600; padding:3px 10px; border-radius:8px;
+    font-family:'Noto Sans Devanagari',sans-serif;
+    box-shadow: var(--elev-1);
+  }
+
+  @keyframes slideIn{
+    0%  { opacity:0; transform: translateX(24px) scale(.96); }
+    100%{ opacity:1; transform: translateX(0) scale(1); }
+  }
+  @keyframes rise{
+    0%{opacity:0; transform:translateY(8px);}
+    100%{opacity:1; transform:translateY(0);}
+  }
+  .msg:nth-child(2){animation-delay:.05s;}
+  .msg:nth-child(3){animation-delay:.15s;}
+  .msg:nth-child(4){animation-delay:.25s;}
+  .msg:nth-child(5){animation-delay:.35s;}
+  .msg:nth-child(6){animation-delay:.45s;}
+  .msg:nth-child(7){animation-delay:.55s;}
+  .card:nth-child(2){animation-delay:.08s;}
+  .card:nth-child(3){animation-delay:.16s;}
+
+  /* ---------- Bottom Navigation (Material style) ---------- */
+  .bottom{
+    background:var(--green);
+    padding: 10px 12px 14px;
+    display:flex; gap:8px;
+    box-shadow: 0 -4px 12px rgba(0,0,0,.15);
+    position:relative; flex-shrink:0;
+  }
+  .baction{
+    flex:1; background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.22);
+    color:#fff; border-radius:12px; padding:9px 4px;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    font-family:'Noto Sans Devanagari',sans-serif; font-weight:700; font-size:11px;
+    cursor:pointer; transition: transform .12s ease;
+    min-height: 56px; /* Material touch target */
+    position:relative; overflow:hidden;
+  }
+  .baction:active{transform:translateY(1px) scale(.97);}
+  .baction.primary{
+    background:#fff; color:var(--green-dark); border-color:#fff;
+    box-shadow: var(--elev-2);
+  }
+
+  /* Responsive */
+  @media (max-width: 360px){
+    .big.xl{font-size:30px;} .amount{font-size:20px;}
+    .logo .name{font-size:16px;} .msg{font-size:12px;}
+  }
+  @media (min-width: 480px){
+    .big.xl{font-size:42px;} .amount{font-size:26px;}
+    .big.sub{font-size:16px;} .msg{font-size:13.5px;}
+    .baction{font-size:12px;}
+  }
+  @media (orientation: landscape) and (max-height: 500px){
+    main{padding-top:6px;}
+    .big.xl{font-size:26px;} .amount{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="app-header">
+    <div class="logo">
+      <div class="mark hi">कि</div>
+      <div style="min-width:0;">
+        <div class="name hi">किराना AI</div>
+        <small class="hi">शर्मा जनरल स्टोर</small>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <div class="icon-btn ripple" title="Notifications">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/>
+          <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>
+        </svg>
+        <span class="dot"></span>
+      </div>
+      <div class="avatar" title="Rahul Sharma">RS</div>
+    </div>
+  </header>
+
+  <main>
+
+    <section class="col-left">
+
+      <div class="card green">
+        <div class="label hi">आज के ऑर्डर्स <span class="pill">● LIVE</span></div>
+        <div class="big xl">23</div>
+        <div class="big sub hi">ऑर्डर्स</div>
+        <div class="amount">₹4,500 <span class="trend">▲ 18%</span></div>
+        <button class="btn btn-green ripple hi">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          नया ऑर्डर
+        </button>
+      </div>
+
+      <div class="card yellow">
+        <div class="label hi">पेंडिंग <span class="pill">देरी</span></div>
+        <div class="big xl" style="display:flex;align-items:center;gap:4px;">
+          <span class="red-dot" style="width:10px;height:10px;"></span>5
+        </div>
+        <div class="big sub hi">पेंडिंग ऑर्डर</div>
+        <button class="btn btn-ghost ripple hi">सभी देखें →</button>
+      </div>
+
+      <div class="card blue">
+        <div class="label hi">टॉप कस्टमर <span class="pill">इस हफ्ते</span></div>
+        <div style="margin-top:8px;">
+          <div class="cust"><div class="ava a">SJ</div><div class="nm hi">शर्मा जी</div><div class="od"><b>12</b></div></div>
+          <div class="cust"><div class="ava b">GJ</div><div class="nm hi">गुप्ता जी</div><div class="od"><b>8</b></div></div>
+          <div class="cust"><div class="ava c">VB</div><div class="nm hi">वर्मा भाई</div><div class="od"><b>6</b></div></div>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="col-right">
+      <div class="chat-header">
+        <h3 class="hi">
+          <span class="wa">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><path d="M20.5 3.5A11 11 0 0 0 3.4 17.1L2 22l5-1.3a11 11 0 0 0 5 1.3h0A11 11 0 0 0 20.5 3.5Zm-8.5 17a9.1 9.1 0 0 1-4.6-1.3l-.3-.2-3 .8.8-2.9-.2-.3A9.1 9.1 0 1 1 12 20.5Zm5.2-6.8c-.3-.1-1.7-.8-1.9-.9s-.5-.1-.7.2-.8.9-1 1.1-.4.2-.7 0a7.6 7.6 0 0 1-2.2-1.4 8.3 8.3 0 0 1-1.5-1.9c-.2-.3 0-.5.1-.6l.5-.5a1.9 1.9 0 0 0 .3-.5.5.5 0 0 0 0-.5c0-.1-.7-1.7-.9-2.3s-.5-.5-.7-.5h-.5a1.1 1.1 0 0 0-.8.4 3.4 3.4 0 0 0-1 2.5 5.9 5.9 0 0 0 1.2 3.1 13.2 13.2 0 0 0 5 4.4c.7.3 1.2.5 1.6.6a3.9 3.9 0 0 0 1.8.1 2.8 2.8 0 0 0 1.9-1.3 2.3 2.3 0 0 0 .2-1.3c-.1-.2-.3-.3-.6-.4Z"/></svg>
+          </span>
+          चैट्स
+        </h3>
+        <span class="all hi">सभी →</span>
+      </div>
+
+      <div class="chat-list">
+        <div class="day"><span class="hi">आज</span></div>
+
+        <div class="msg in">
+          <span class="name n1 hi">शर्मा जी</span>
+          <span class="hi">मांगी 2L दूध</span>
+          <span class="tag order"><i></i>Order</span>
+          <span class="time">10:30 AM</span>
+        </div>
+
+        <div class="msg out">
+          <span class="hi">जी भैया, 10 मिनट में ✅</span>
+          <span class="time">10:31 AM <span class="tick">✓✓</span></span>
+        </div>
+
+        <div class="msg in">
+          <span class="name n2 hi">गुप्ता जी</span>
+          <span class="hi">चावल रेट?</span>
+          <span class="tag enq"><i></i>Enquiry</span>
+          <span class="time">11:15 AM</span>
+        </div>
+
+        <div class="msg in">
+          <span class="name n3 hi">वर्मा भाई</span>
+          <span class="hi">आटा 10kg, चीनी 2kg</span>
+          <span class="tag order"><i></i>Order</span>
+          <span class="time">11:42 AM</span>
+        </div>
+
+        <div class="msg in">
+          <span class="name n4 hi">मीना दीदी</span>
+          <span class="hi">पेमेंट हो गई — ₹850</span>
+          <span class="tag pay"><i></i>Payment</span>
+          <span class="time">12:08 PM</span>
+        </div>
+
+        <div class="msg in">
+          <span class="name n5 hi">पांडेय जी</span>
+          <span class="hi">जल्दी! तेल खत्म है</span>
+          <span class="tag urg"><i></i>Urgent</span>
+          <span class="time">12:20 PM</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="bottom">
+    <button class="baction ripple hi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9 6 9-6"/><rect x="3" y="5" width="18" height="14" rx="2"/></svg>
+      बल्क मैसेज
+    </button>
+    <button class="baction primary ripple hi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      रिमाइंडर
+    </button>
+    <button class="baction ripple hi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      रिपोर्ट
+    </button>
+  </nav>
+
+</div>
+
+<script>
+  // Service Worker registration for PWA (needed for APK)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  // Ripple position tracking for Material feel
+  document.querySelectorAll('.ripple').forEach(el => {
+    el.addEventListener('pointerdown', (e) => {
+      const rect = el.getBoundingClientRect();
+      el.style.setProperty('--rx', ((e.clientX - rect.left) / rect.width * 100) + '%');
+      el.style.setProperty('--ry', ((e.clientY - rect.top) / rect.height * 100) + '%');
+    });
+  });
+</script>
+
+</body>
+</html>
