@@ -9,6 +9,13 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
+    // Check if language is chosen
+    const lang = typeof window !== "undefined" ? localStorage.getItem("kirana_lang") : null;
+    if (!lang) {
+      router.replace("/language");
+      return;
+    }
+
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.replace("/login");
@@ -18,6 +25,8 @@ export default function Home() {
       if (!shop) {
         router.replace("/onboarding");
       } else {
+        // Sync shop language to localStorage
+        if (shop.language) localStorage.setItem("kirana_lang", shop.language);
         router.replace("/dashboard");
       }
     });
@@ -31,7 +40,7 @@ export default function Home() {
           <span className="text-brand text-3xl font-bold hi">कि</span>
         </div>
         <h1 className="text-3xl font-bold hi mb-2">किराना AI</h1>
-        <p className="text-white/80 text-sm hi">लोड हो रहा है...</p>
+        <p className="text-white/80 text-sm hi">Loading...</p>
       </div>
     </div>
   );
