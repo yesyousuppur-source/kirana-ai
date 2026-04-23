@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { createShop } from "@/lib/store";
+import { t, getSavedLang } from "@/lib/i18n";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -13,8 +14,10 @@ export default function OnboardingPage() {
   const [city, setCity] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lang, setLang] = useState("hi");
 
   useEffect(() => {
+    setLang(getSavedLang());
     const unsub = onAuthStateChanged(auth, (u) => {
       if (!u) router.replace("/login");
       else setUser(u);
@@ -25,7 +28,7 @@ export default function OnboardingPage() {
   async function submit() {
     setError("");
     if (!shopName || !ownerName || !city) {
-      setError("सारी जानकारी भरें");
+      setError(t(lang, "fillAllFields"));
       return;
     }
     setLoading(true);
@@ -35,10 +38,11 @@ export default function OnboardingPage() {
         ownerName,
         city,
         phone: user.phoneNumber,
+        language: lang,
       });
       router.replace("/dashboard");
     } catch (e) {
-      setError("कुछ समस्या हुई। दोबारा कोशिश करें।");
+      setError(t(lang, "problemOccurred"));
       console.error(e);
     }
     setLoading(false);
@@ -50,45 +54,45 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-gradient-to-b from-brand to-brand-dark p-6">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-6 pt-8">
-          <h1 className="text-white text-2xl font-bold hi">आपका स्वागत है! 🙏</h1>
+          <h1 className="text-white text-2xl font-bold hi">{t(lang, "welcome")} 🙏</h1>
           <p className="text-white/80 text-sm mt-1 hi">
-            अपनी दुकान की जानकारी भरें
+            {t(lang, "shopInfo")}
           </p>
         </div>
 
         <div className="bg-white rounded-2xl p-6 shadow-2xl">
           <div className="mb-4">
             <label className="text-sm font-bold text-gray-700 hi block mb-1">
-              दुकान का नाम *
+              {t(lang, "shopName")} *
             </label>
             <input
               value={shopName}
               onChange={(e) => setShopName(e.target.value)}
-              placeholder="जैसे: शर्मा जनरल स्टोर"
+              placeholder={t(lang, "shopNamePlaceholder")}
               className="w-full px-4 py-3 border rounded-xl outline-none focus:border-brand hi"
             />
           </div>
 
           <div className="mb-4">
             <label className="text-sm font-bold text-gray-700 hi block mb-1">
-              आपका नाम *
+              {t(lang, "ownerName")} *
             </label>
             <input
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
-              placeholder="जैसे: राहुल शर्मा"
+              placeholder={t(lang, "ownerNamePlaceholder")}
               className="w-full px-4 py-3 border rounded-xl outline-none focus:border-brand hi"
             />
           </div>
 
           <div className="mb-4">
             <label className="text-sm font-bold text-gray-700 hi block mb-1">
-              शहर *
+              {t(lang, "city")} *
             </label>
             <input
               value={city}
               onChange={(e) => setCity(e.target.value)}
-              placeholder="जैसे: कानपुर"
+              placeholder={t(lang, "cityPlaceholder")}
               className="w-full px-4 py-3 border rounded-xl outline-none focus:border-brand hi"
             />
           </div>
@@ -100,14 +104,14 @@ export default function OnboardingPage() {
             disabled={loading}
             className="w-full bg-brand text-white py-3 rounded-xl font-bold hi disabled:opacity-50 active:bg-brand-dark"
           >
-            {loading ? "सेव हो रहा है..." : "शुरू करें →"}
+            {loading ? t(lang, "saving") : t(lang, "startBtn") + " →"}
           </button>
         </div>
 
         <p className="text-center text-white/70 text-xs mt-4 hi">
-          7 दिन का फ्री ट्रायल मिलेगा ✨
+          {t(lang, "trialInfo")}
         </p>
       </div>
     </div>
   );
-                }
+}
