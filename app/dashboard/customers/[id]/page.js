@@ -145,4 +145,262 @@ export default function CustomerLedgerPage() {
       return;
     }
     const msg = paymentReminderMsg(
-      customer.nam
+      customer.name,
+      customer.udhaar,
+      shop?.shopName || "हमारी दुकान",
+      lang
+    );
+    window.open(waLink(customer.phone, msg), "_blank");
+  }
+
+  const groupedOrders = orders.reduce((acc, o) => {
+    if (!o.createdAt?.toDate) return acc;
+    const date = o.createdAt.toDate();
+    const dateKey = date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    if (!acc[dateKey]) acc[dateKey] = [];
+    acc[dateKey].push(o);
+    return acc;
+  }, {});
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-500 hi">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!customer) return null;
+
+  const init = (customer.name || "?")
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const totalPaid = orders
+    .filter((o) => o.paid)
+    .reduce((s, o) => s + Number(o.total || 0), 0);
+
+  return (
+    <div className="min-h-screen bg-slate-50 max-w-3xl mx-auto pb-20">
+      <header className="bg-brand text-white px-4 h-[60px] flex items-center gap-3 sticky top-0 z-20 shadow-md">
+        <button onClick={() => router.back()} className="p-1">
+          <ArrowLeft size={24} />
+        </button>
+        <h1 className="font-bold text-lg hi truncate flex-1">{customer.name}</h1>
+      </header>
+
+      <div className="bg-gradient-to-b from-brand to-brand-dark text-white p-5 rounded-b-3xl shadow-lg">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-16 h-16 rounded-full bg-white text-brand flex items-center justify-center font-extrabold text-xl shadow-lg">
+            {init}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-xl hi truncate">{customer.name}</div>
+            <a
+              href={`tel:${customer.phone}`}
+              className="text-sm opacity-90 flex items-center gap-1 hover:underline"
+            >
+              <Phone size={12} /> {customer.phone}
+            </a>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 mt-4">
+          <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur">
+            <div className="text-[10px] opacity-80 hi">{t(lang, "udhaar")}</div>
+            <div className="text-xl font-extrabold">
+              ₹{(customer.udhaar || 0).toLocaleString("en-IN")}
+            </div>
+          </div>
+          <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur">
+            <div className="text-[10px] opacity-80 hi">{t(lang, "paid")}</div>
+            <div className="text-xl font-extrabold">
+              ₹{totalPaid.toLocaleString("en-IN")}
+            </div>
+          </div>
+          <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur">
+            <div className="text-[10px] opacity-80 hi">{t(lang, "ordersLabel")}</div>
+            <div className="text-xl font-extrabold">{orders.length}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-3 py-3 sticky top-[60px] bg-slate-50 z-10">
+        <button
+          onClick={sendReminder}
+          disabled={!customer.udhaar || customer.udhaar <= 0}
+          className="w-full bg-green-50 text-green-700 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 active:bg-green-100 disabled:opacity-40 hi"
+        >
+          <MessageCircle size={16} /> {t(lang, "reminder")}
+        </button>
+      </div>
+
+      <div className="px-3">
+        {orders.length === 0 ? (
+          <div className="text-center py-16">
+            <ShoppingBag size={48} className="mx-auto text-slate-300 mb-3" />
+            <p className="font-bold hi">{t(lang, "noOrdersYet")}</p>
+            <p className="text-sm text-slate-500 hi mt-1">{t(lang, "addFirstOrder")}</p>
+          </div>
+        ) : (
+          Object.entries(groupedOrders).map(([date, dayOrders]) => (
+            <div key={date} className="mb-4">
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <Calendar size={14} className="text-slate-400" />
+                <h3 className="text-xs font-bold text-slate-600 hi">{date}</h3>
+                <div className="flex-1 h-px bg-slate-200"></div>
+                <span className="text-xs text-slate-500 font-semibold">
+                  ₹{dayOrders.reduce((s, o) => s + Number(o.total || 0), 0)}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {dayOrders.map((o) => (
+                  <div
+                    key={o.id}
+                    className="bg-white rounded-xl p-3 shadow-sm border border-slate-100"
+                  >
+                    <div className="flex items-start justify-between mb-1.5 gap-2">
+                      <div className="flex-1 min-w-0">
+                        {o.orderNumber && (
+                          <div className="flex items-center gap-1 text-[10px] font-bold text-blue-700 mb-1">
+                            <Hash size={10} />
+                            {o.orderNumber}
+                          </div>
+                        )}
+                        <div className="text-sm hi">{o.items || "Order"}</div>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                          o.paid
+                            ? o.paymentMethod === "upi"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {o.paid
+                          ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}`
+                          : t(lang, "udhaar")}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                      <div>
+                        <div className="text-lg font-extrabold text-brand">
+                          ₹{Number(o.total || 0).toLocaleString("en-IN")}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {o.createdAt?.toDate
+                            ? o.createdAt.toDate().toLocaleTimeString("en-IN", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : ""}
+                        </div>
+                      </div>
+                      {!o.paid && (
+                        <button
+                          onClick={() => openPaymentModal(o)}
+                          className="bg-brand text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 active:bg-brand-dark"
+                        >
+                          <Check size={12} /> {t(lang, "paid")}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Payment Method Modal */}
+      {showPayModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <h2 className="text-xl font-bold hi">{t(lang, "paymentMethod")}</h2>
+                <p className="text-sm text-slate-500 hi mt-1">{t(lang, "paymentMethodSub")}</p>
+                <div className="mt-3 inline-flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
+                  <span className="text-sm font-semibold">₹{selectedOrder.total}</span>
+                  {selectedOrder.orderNumber && (
+                    <span className="text-xs text-slate-500">• {selectedOrder.orderNumber}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowPayModal(false); setSelectedOrder(null); }}
+                className="p-1 text-slate-500"
+              >
+                <X size={22}/>
+              </button>
+            </div>
+
+            <div className="space-y-3 mt-5">
+              {/* Cash option */}
+              <button
+                onClick={() => confirmPayment("cash")}
+                className="w-full p-4 bg-green-50 hover:bg-green-100 active:bg-green-200 rounded-xl flex items-center gap-3 border-2 border-transparent active:border-green-500 transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Banknote size={24} className="text-white"/>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-bold hi">{t(lang, "cash")}</div>
+                  <div className="text-xs text-slate-500 hi">{t(lang, "cashSub")}</div>
+                </div>
+              </button>
+
+              {/* UPI option */}
+              <button
+                onClick={() => confirmPayment("upi")}
+                className="w-full p-4 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 rounded-xl flex items-center gap-3 border-2 border-transparent active:border-blue-500 transition-all"
+              >
+                <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                  <Smartphone size={24} className="text-white"/>
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="font-bold hi">{t(lang, "upi")}</div>
+                  <div className="text-xs text-slate-500 hi">{t(lang, "upiSub")}</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* UPI Not Set Alert */}
+      {showUpiAlert && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 text-center">
+            <div className="w-14 h-14 bg-yellow-100 rounded-full mx-auto flex items-center justify-center mb-3">
+              <Smartphone size={28} className="text-yellow-600"/>
+            </div>
+            <h3 className="font-bold text-lg hi mb-1">{t(lang, "upiNotSet")}</h3>
+            <p className="text-sm text-slate-600 hi mb-4">
+              {t(lang, "upiNotSetMsg")}
+            </p>
+            <div className="text-xs text-slate-500 mb-4 bg-slate-50 p-2 rounded-lg">
+              💡 Firestore me jaa kar shop document me <code className="text-blue-600">upiId</code> field add karo (jaise <code>name@paytm</code>). Settings page baad me banayenge.
+            </div>
+            <button
+              onClick={() => setShowUpiAlert(false)}
+              className="w-full bg-brand text-white py-2.5 rounded-xl font-bold hi"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+                                                          }
