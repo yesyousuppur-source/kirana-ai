@@ -331,6 +331,7 @@ export default function CustomerLedgerPage() {
         </div>
       )}
 
+
       {showUpiAlert && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-sm rounded-2xl p-6 text-center">
