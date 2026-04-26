@@ -13,16 +13,8 @@ import { waLink, paymentReminderMsg, paymentReceivedMsg } from "@/lib/whatsapp";
 import { openUpiApp, isValidUpiId } from "@/lib/upi";
 import { t, getSavedLang } from "@/lib/i18n";
 import {
-  ArrowLeft,
-  Phone,
-  MessageCircle,
-  Check,
-  Calendar,
-  ShoppingBag,
-  Banknote,
-  Smartphone,
-  X,
-  Hash,
+  ArrowLeft, Phone, MessageCircle, Check, Calendar,
+  ShoppingBag, Banknote, Smartphone, X, Hash,
 } from "lucide-react";
 
 export default function CustomerLedgerPage() {
@@ -36,7 +28,6 @@ export default function CustomerLedgerPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState("hi");
-
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showUpiAlert, setShowUpiAlert] = useState(false);
@@ -51,7 +42,7 @@ export default function CustomerLedgerPage() {
         setShop(s);
         await load(u.uid);
       } catch (e) {
-        console.error("Init error:", e);
+        console.error(e);
         setLoading(false);
       }
     });
@@ -68,17 +59,14 @@ export default function CustomerLedgerPage() {
         return;
       }
       setCustomer(c);
-      // Load orders separately so customer shows even if orders fail
       try {
         const o = await getCustomerOrders(uid, customerId);
         setOrders(o);
-      } catch (orderErr) {
-        console.error("Orders load error:", orderErr);
+      } catch (err) {
+        console.error(err);
         setOrders([]);
       }
-    } catch (e) {
-      console.error("Load error:", e);
-    }
+    } catch (e) { console.error(e); }
     setLoading(false);
   }
 
@@ -89,28 +77,22 @@ export default function CustomerLedgerPage() {
 
   async function confirmPayment(method) {
     if (!selectedOrder) return;
-
     if (method === "upi") {
       if (!shop?.upiId || !isValidUpiId(shop.upiId)) {
         setShowPayModal(false);
         setShowUpiAlert(true);
         return;
       }
-
       openUpiApp({
         upiId: shop.upiId,
         payeeName: shop.shopName || "Shop",
         amount: selectedOrder.total,
         note: `${selectedOrder.orderNumber || ""} ${customer.name}`,
       });
-
       setTimeout(async () => {
-        const confirmPaid = confirm(
-          `${t(lang, "markPaid")} (₹${selectedOrder.total} via UPI)`
-        );
-        if (confirmPaid) {
+        if (confirm(`${t(lang, "markPaid")} (₹${selectedOrder.total} via UPI)`)) {
           await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, "upi");
-          await sendPaymentReceipt(selectedOrder, "upi");
+          await sendReceipt(selectedOrder, "upi");
           await load(user.uid);
         }
         setShowPayModal(false);
@@ -118,15 +100,13 @@ export default function CustomerLedgerPage() {
       }, 2500);
       return;
     }
-
     await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, "cash");
-    await sendPaymentReceipt(selectedOrder, "cash");
+    await sendReceipt(selectedOrder, "cash");
     await load(user.uid);
     setShowPayModal(false);
     setSelectedOrder(null);
   }
-
-  async function sendPaymentReceipt(order, method) {
+ async function sendReceipt(order, method) {
     if (!customer.phone) return;
     const msg = paymentReceivedMsg(
       customer.name,
@@ -157,9 +137,7 @@ export default function CustomerLedgerPage() {
     if (!o.createdAt?.toDate) return acc;
     const date = o.createdAt.toDate();
     const dateKey = date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+      day: "2-digit", month: "short", year: "numeric",
     });
     if (!acc[dateKey]) acc[dateKey] = [];
     acc[dateKey].push(o);
@@ -174,28 +152,10 @@ export default function CustomerLedgerPage() {
     );
   }
 
-  if (!customer) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 text-center">
-        <div>
-          <p className="text-slate-700 font-bold mb-2">Customer not found</p>
-          <button
-            onClick={() => router.replace("/dashboard/customers")}
-            className="bg-brand text-white px-4 py-2 rounded-xl font-bold"
-          >
-            Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!customer) return null;
 
   const init = (customer.name || "?")
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+    .split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
   const totalPaid = orders
     .filter((o) => o.paid)
@@ -217,10 +177,7 @@ export default function CustomerLedgerPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-bold text-xl hi truncate">{customer.name}</div>
-            <a
-              href={`tel:${customer.phone}`}
-              className="text-sm opacity-90 flex items-center gap-1 hover:underline"
-            >
+            <a href={`tel:${customer.phone}`} className="text-sm opacity-90 flex items-center gap-1">
               <Phone size={12} /> {customer.phone}
             </a>
           </div>
@@ -255,8 +212,7 @@ export default function CustomerLedgerPage() {
           <MessageCircle size={16} /> {t(lang, "reminder")}
         </button>
       </div>
-
-      <div className="px-3">
+            <div className="px-3">
         {orders.length === 0 ? (
           <div className="text-center py-16">
             <ShoppingBag size={48} className="mx-auto text-slate-300 mb-3" />
@@ -274,13 +230,9 @@ export default function CustomerLedgerPage() {
                   ₹{dayOrders.reduce((s, o) => s + Number(o.total || 0), 0)}
                 </span>
               </div>
-
               <div className="space-y-2">
                 {dayOrders.map((o) => (
-                  <div
-                    key={o.id}
-                    className="bg-white rounded-xl p-3 shadow-sm border border-slate-100"
-                  >
+                  <div key={o.id} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
                     <div className="flex items-start justify-between mb-1.5 gap-2">
                       <div className="flex-1 min-w-0">
                         {o.orderNumber && (
@@ -293,18 +245,14 @@ export default function CustomerLedgerPage() {
                         )}
                         <div className="text-sm hi">{o.items || "Order"}</div>
                       </div>
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                          o.paid
-                            ? o.paymentMethod === "upi"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-green-100 text-green-800"
-                            : "bg-yellow-100 text-yellow-800"
-                        }`}
-                      >
-                        {o.paid
-                          ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}`
-                          : t(lang, "udhaar")}
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        o.paid
+                          ? o.paymentMethod === "upi"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-green-100 text-green-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}>
+                        {o.paid ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}` : t(lang, "udhaar")}
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
@@ -315,8 +263,7 @@ export default function CustomerLedgerPage() {
                         <div className="text-[10px] text-slate-400">
                           {o.createdAt?.toDate
                             ? o.createdAt.toDate().toLocaleTimeString("en-IN", {
-                                hour: "2-digit",
-                                minute: "2-digit",
+                                hour: "2-digit", minute: "2-digit",
                               })
                             : ""}
                         </div>
@@ -347,29 +294,19 @@ export default function CustomerLedgerPage() {
                 <p className="text-sm text-slate-500 hi mt-1">{t(lang, "paymentMethodSub")}</p>
                 <div className="mt-3 inline-flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
                   <span className="text-sm font-semibold">₹{selectedOrder.total}</span>
-                  {selectedOrder.orderNumber && (
-                    <span className="text-xs text-slate-500">
-                      • {typeof selectedOrder.orderNumber === "number"
-                          ? `#${String(selectedOrder.orderNumber).padStart(4, "0")}`
-                          : selectedOrder.orderNumber}
-                    </span>
-                  )}
                 </div>
               </div>
               <button
                 onClick={() => { setShowPayModal(false); setSelectedOrder(null); }}
                 className="p-1 text-slate-500"
-              >
-                <X size={22}/>
-              </button>
+              ><X size={22}/></button>
             </div>
-
             <div className="space-y-3 mt-5">
               <button
                 onClick={() => confirmPayment("cash")}
-                className="w-full p-4 bg-green-50 hover:bg-green-100 active:bg-green-200 rounded-xl flex items-center gap-3 border-2 border-transparent active:border-green-500 transition-all"
+                className="w-full p-4 bg-green-50 active:bg-green-200 rounded-xl flex items-center gap-3"
               >
-                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
                   <Banknote size={24} className="text-white"/>
                 </div>
                 <div className="flex-1 text-left">
@@ -377,12 +314,11 @@ export default function CustomerLedgerPage() {
                   <div className="text-xs text-slate-500 hi">{t(lang, "cashSub")}</div>
                 </div>
               </button>
-
               <button
                 onClick={() => confirmPayment("upi")}
-                className="w-full p-4 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 rounded-xl flex items-center gap-3 border-2 border-transparent active:border-blue-500 transition-all"
+                className="w-full p-4 bg-blue-50 active:bg-blue-200 rounded-xl flex items-center gap-3"
               >
-                <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center">
                   <Smartphone size={24} className="text-white"/>
                 </div>
                 <div className="flex-1 text-left">
@@ -402,18 +338,14 @@ export default function CustomerLedgerPage() {
               <Smartphone size={28} className="text-yellow-600"/>
             </div>
             <h3 className="font-bold text-lg hi mb-1">{t(lang, "upiNotSet")}</h3>
-            <p className="text-sm text-slate-600 hi mb-4">
-              {t(lang, "upiNotSetMsg")}
-            </p>
+            <p className="text-sm text-slate-600 hi mb-4">{t(lang, "upiNotSetMsg")}</p>
             <button
               onClick={() => setShowUpiAlert(false)}
               className="w-full bg-brand text-white py-2.5 rounded-xl font-bold hi"
-            >
-              OK
-            </button>
+            >OK</button>
           </div>
         </div>
       )}
     </div>
   );
-}
+            }
