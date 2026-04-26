@@ -17,6 +17,7 @@ import {
   Clock,
   TrendingUp,
   LogOut,
+  Settings,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -84,6 +85,12 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push("/dashboard/settings")}
+            className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center"
+          >
+            <Settings size={20} />
+          </button>
           <button className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center relative">
             <Bell size={20} />
             {pendingOrders.length > 0 && (
@@ -256,7 +263,14 @@ export default function Dashboard() {
           <Clock size={20}/>
           ऑर्डर्स
         </button>
+        <button
+          onClick={() => router.push("/dashboard/settings")}
+          className="flex-1 bg-white/12 border border-white/20 text-white rounded-xl py-2 flex flex-col items-center gap-0.5 text-[11px] font-bold hi active:scale-95 transition-transform"
+        >
+          <Settings size={20}/>
+          सेटिंग्स
+        </button>
       </nav>
     </div>
   );
-    }
+}
