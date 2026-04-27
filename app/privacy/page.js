@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
             <strong>Jeet Singh</strong>, a sole proprietor based in Gurugram, Haryana, India.
             This Privacy Policy explains how we collect, use, and protect your personal
             information when you use our application available at{" "}
-            <a href="https://www.yesyoupro.com" className="text-brand underline">www.yesyoupro.com</a>{" "}
+            <a href="https://www.kiranaai.shop.com" className="text-brand underline">www.kiranaai.shop.com</a>{" "}
             and related services (collectively, the "Service").
           </p>
 
