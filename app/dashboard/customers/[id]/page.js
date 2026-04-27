@@ -4,17 +4,14 @@ import { useRouter, useParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
-  getShop,
-  getCustomer,
-  getCustomerOrders,
-  markOrderPaid,
+  getShop, getCustomer, getCustomerOrders, markOrderPaid,
 } from "@/lib/store";
 import { waLink, paymentReminderMsg, paymentReceivedMsg } from "@/lib/whatsapp";
-import { openUpiApp, isValidUpiId } from "@/lib/upi";
+import { openUpiApp } from "@/lib/upi";
 import { t, getSavedLang } from "@/lib/i18n";
 import {
-  ArrowLeft, Phone, MessageCircle, Check, Calendar,
-  ShoppingBag, Banknote, Smartphone, X, Hash,
+  ArrowLeft, Phone, MessageCircle, Check,
+  Calendar, ShoppingBag, Banknote, Smartphone, X, Hash,
 } from "lucide-react";
 
 export default function CustomerLedgerPage() {
@@ -30,7 +27,6 @@ export default function CustomerLedgerPage() {
   const [lang, setLang] = useState("hi");
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [showUpiAlert, setShowUpiAlert] = useState(false);
 
   useEffect(() => {
     setLang(getSavedLang());
@@ -77,36 +73,25 @@ export default function CustomerLedgerPage() {
 
   async function confirmPayment(method) {
     if (!selectedOrder) return;
-    if (method === "upi") {
-      if (!shop?.upiId || !isValidUpiId(shop.upiId)) {
-        setShowPayModal(false);
-        setShowUpiAlert(true);
-        return;
-      }
+    setShowPayModal(false);
+
+    // UPI — agar ID set hai toh app kholo, warna sirf paid mark karo
+    if (method === "upi" && shop?.upiId) {
       openUpiApp({
         upiId: shop.upiId,
         payeeName: shop.shopName || "Shop",
         amount: selectedOrder.total,
         note: `${selectedOrder.orderNumber || ""} ${customer.name}`,
       });
-      setTimeout(async () => {
-        if (confirm(`${t(lang, "markPaid")} (₹${selectedOrder.total} via UPI)`)) {
-          await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, "upi");
-          await sendReceipt(selectedOrder, "upi");
-          await load(user.uid);
-        }
-        setShowPayModal(false);
-        setSelectedOrder(null);
-      }, 2500);
-      return;
     }
-    await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, "cash");
-    await sendReceipt(selectedOrder, "cash");
+
+    // Dono cases me — turant paid mark karo
+    await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, method);
+    await sendReceipt(selectedOrder, method);
     await load(user.uid);
-    setShowPayModal(false);
     setSelectedOrder(null);
   }
- async function sendReceipt(order, method) {
+  async function sendReceipt(order, method) {
     if (!customer.phone) return;
     const msg = paymentReceivedMsg(
       customer.name,
@@ -135,8 +120,7 @@ export default function CustomerLedgerPage() {
 
   const groupedOrders = orders.reduce((acc, o) => {
     if (!o.createdAt?.toDate) return acc;
-    const date = o.createdAt.toDate();
-    const dateKey = date.toLocaleDateString("en-IN", {
+    const dateKey = o.createdAt.toDate().toLocaleDateString("en-IN", {
       day: "2-digit", month: "short", year: "numeric",
     });
     if (!acc[dateKey]) acc[dateKey] = [];
@@ -182,7 +166,6 @@ export default function CustomerLedgerPage() {
             </a>
           </div>
         </div>
-
         <div className="grid grid-cols-3 gap-2 mt-4">
           <div className="bg-white/15 rounded-xl p-3 text-center backdrop-blur">
             <div className="text-[10px] opacity-80 hi">{t(lang, "udhaar")}</div>
@@ -212,7 +195,7 @@ export default function CustomerLedgerPage() {
           <MessageCircle size={16} /> {t(lang, "reminder")}
         </button>
       </div>
-            <div className="px-3">
+<div className="px-3">
         {orders.length === 0 ? (
           <div className="text-center py-16">
             <ShoppingBag size={48} className="mx-auto text-slate-300 mb-3" />
@@ -224,7 +207,7 @@ export default function CustomerLedgerPage() {
             <div key={date} className="mb-4">
               <div className="flex items-center gap-2 mb-2 px-1">
                 <Calendar size={14} className="text-slate-400" />
-                <h3 className="text-xs font-bold text-slate-600 hi">{date}</h3>
+                <h3 className="text-xs font-bold text-slate-600">{date}</h3>
                 <div className="flex-1 h-px bg-slate-200"></div>
                 <span className="text-xs text-slate-500 font-semibold">
                   ₹{dayOrders.reduce((s, o) => s + Number(o.total || 0), 0)}
@@ -252,7 +235,9 @@ export default function CustomerLedgerPage() {
                             : "bg-green-100 text-green-800"
                           : "bg-yellow-100 text-yellow-800"
                       }`}>
-                        {o.paid ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}` : t(lang, "udhaar")}
+                        {o.paid
+                          ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}`
+                          : t(lang, "udhaar")}
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
@@ -268,14 +253,22 @@ export default function CustomerLedgerPage() {
                             : ""}
                         </div>
                       </div>
-                      {!o.paid && (
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => openPaymentModal(o)}
-                          className="bg-brand text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 active:bg-brand-dark"
+                          onClick={() => router.push(`/dashboard/orders/${o.id}`)}
+                          className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"
                         >
-                          <Check size={12} /> {t(lang, "paid")}
+                          ✏️ Edit
                         </button>
-                      )}
+                        {!o.paid && (
+                          <button
+                            onClick={() => openPaymentModal(o)}
+                            className="bg-brand text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                          >
+                            <Check size={12} /> {t(lang, "paid")}
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -292,24 +285,26 @@ export default function CustomerLedgerPage() {
               <div className="flex-1">
                 <h2 className="text-xl font-bold hi">{t(lang, "paymentMethod")}</h2>
                 <p className="text-sm text-slate-500 hi mt-1">{t(lang, "paymentMethodSub")}</p>
-                <div className="mt-3 inline-flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
-                  <span className="text-sm font-semibold">₹{selectedOrder.total}</span>
+                <div className="mt-2 bg-slate-100 px-3 py-1.5 rounded-lg inline-flex gap-2 items-center">
+                  <span className="font-bold">₹{selectedOrder.total}</span>
                 </div>
               </div>
               <button
                 onClick={() => { setShowPayModal(false); setSelectedOrder(null); }}
                 className="p-1 text-slate-500"
-              ><X size={22}/></button>
+              >
+                <X size={22}/>
+              </button>
             </div>
-            <div className="space-y-3 mt-5">
+            <div className="space-y-3 mt-4">
               <button
                 onClick={() => confirmPayment("cash")}
                 className="w-full p-4 bg-green-50 active:bg-green-200 rounded-xl flex items-center gap-3"
               >
-                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                   <Banknote size={24} className="text-white"/>
                 </div>
-                <div className="flex-1 text-left">
+                <div className="text-left">
                   <div className="font-bold hi">{t(lang, "cash")}</div>
                   <div className="text-xs text-slate-500 hi">{t(lang, "cashSub")}</div>
                 </div>
@@ -318,32 +313,15 @@ export default function CustomerLedgerPage() {
                 onClick={() => confirmPayment("upi")}
                 className="w-full p-4 bg-blue-50 active:bg-blue-200 rounded-xl flex items-center gap-3"
               >
-                <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                   <Smartphone size={24} className="text-white"/>
                 </div>
-                <div className="flex-1 text-left">
+                <div className="text-left">
                   <div className="font-bold hi">{t(lang, "upi")}</div>
                   <div className="text-xs text-slate-500 hi">{t(lang, "upiSub")}</div>
                 </div>
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-
-      {showUpiAlert && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 text-center">
-            <div className="w-14 h-14 bg-yellow-100 rounded-full mx-auto flex items-center justify-center mb-3">
-              <Smartphone size={28} className="text-yellow-600"/>
-            </div>
-            <h3 className="font-bold text-lg hi mb-1">{t(lang, "upiNotSet")}</h3>
-            <p className="text-sm text-slate-600 hi mb-4">{t(lang, "upiNotSetMsg")}</p>
-            <button
-              onClick={() => setShowUpiAlert(false)}
-              className="w-full bg-brand text-white py-2.5 rounded-xl font-bold hi"
-            >OK</button>
           </div>
         </div>
       )}
