@@ -3,10 +3,10 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { getShop, getOrders, updateOrder } from "@/lib/store";
+import { getShop, getOrders, updateOrder, cancelOrder } from "@/lib/store";
 import { waLink, orderConfirmMsg } from "@/lib/whatsapp";
 import { t, getSavedLang } from "@/lib/i18n";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, X } from "lucide-react";
 
 export default function EditOrderPage() {
   const router = useRouter();
@@ -22,6 +22,8 @@ export default function EditOrderPage() {
   const [sendWA, setSendWA] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [lang, setLang] = useState("hi");
 
   useEffect(() => {
@@ -74,6 +76,19 @@ export default function EditOrderPage() {
       alert("Save failed. Try again.");
     }
     setSaving(false);
+  }
+
+  async function handleCancel() {
+    setCancelling(true);
+    try {
+      await cancelOrder(user.uid, orderId, order);
+      router.replace("/dashboard/orders");
+    } catch (e) {
+      console.error(e);
+      alert("Cancel failed. Try again.");
+    }
+    setCancelling(false);
+    setShowCancelConfirm(false);
   }
 
   if (loading) {
@@ -137,7 +152,6 @@ export default function EditOrderPage() {
           </div>
         </div>
 
-        {/* FIXED: Toggle button overflow */}
         <div className="bg-white rounded-xl p-3 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -169,8 +183,17 @@ export default function EditOrderPage() {
             />
           </label>
         </div>
+
+        {/* Cancel Button */}
+        <button
+          onClick={() => setShowCancelConfirm(true)}
+          className="w-full bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl font-bold hi flex items-center justify-center gap-2 active:bg-red-100"
+        >
+          <X size={18} /> ऑर्डर कैंसल करें
+        </button>
       </div>
 
+      {/* Save Button */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 max-w-3xl mx-auto">
         <button
           onClick={handleSave}
@@ -181,6 +204,41 @@ export default function EditOrderPage() {
           {saving ? "सेव हो रहा है..." : "बदलाव सेव करें"}
         </button>
       </div>
+
+      {/* Cancel Confirm Modal */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl p-6 text-center">
+            <div className="w-14 h-14 bg-red-100 rounded-full mx-auto flex items-center justify-center mb-3">
+              <X size={28} className="text-red-600" />
+            </div>
+            <h3 className="font-bold text-lg hi mb-1">ऑर्डर कैंसल करें?</h3>
+            <p className="text-sm text-slate-600 hi mb-2">
+              {order?.customerName} का यह ऑर्डर हट जाएगा।
+            </p>
+            {!order?.paid && (
+              <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 mb-2 hi">
+                ✓ ₹{order?.total} का उधार भी हट जाएगा
+              </p>
+            )}
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 py-2.5 border rounded-xl font-bold hi text-slate-600"
+              >
+                वापस जाएं
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-bold hi disabled:opacity-50"
+              >
+                {cancelling ? "..." : "हाँ, कैंसल करें"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
