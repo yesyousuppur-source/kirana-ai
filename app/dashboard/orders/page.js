@@ -5,7 +5,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { getOrders, markOrderPaid, getShop } from "@/lib/store";
 import { waLink, paymentReceivedMsg } from "@/lib/whatsapp";
-import { openUpiApp, isValidUpiId } from "@/lib/upi";
+import { openUpiApp } from "@/lib/upi";
 import { t, getSavedLang } from "@/lib/i18n";
 import {
   ArrowLeft, Check, MessageCircle,
@@ -21,7 +21,6 @@ export default function OrdersPage() {
   const [lang, setLang] = useState("hi");
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [showUpiAlert, setShowUpiAlert] = useState(false);
 
   useEffect(() => {
     setLang(getSavedLang());
@@ -47,47 +46,33 @@ export default function OrdersPage() {
 
   async function confirmPayment(method) {
     if (!selectedOrder) return;
-    if (method === "upi") {
-      if (!shop?.upiId || !isValidUpiId(shop.upiId)) {
-        setShowPayModal(false);
-        setShowUpiAlert(true);
-        return;
-      }
+    setShowPayModal(false);
+
+    if (method === "upi" && shop?.upiId) {
       openUpiApp({
         upiId: shop.upiId,
         payeeName: shop.shopName || "Shop",
         amount: selectedOrder.total,
         note: `${selectedOrder.orderNumber || ""} ${selectedOrder.customerName || ""}`,
       });
-      setTimeout(async () => {
-        if (confirm(`${t(lang, "markPaid")} (₹${selectedOrder.total} via UPI)`)) {
-          await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, "upi");
-          sendReceipt(selectedOrder, "upi");
-          await load(user.uid);
-        }
-        setShowPayModal(false);
-        setSelectedOrder(null);
-      }, 2500);
-      return;
     }
-    await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, "cash");
-    sendReceipt(selectedOrder, "cash");
-    await load(user.uid);
-    setShowPayModal(false);
-    setSelectedOrder(null);
-  }
 
-  function sendReceipt(order, method) {
-    if (!order.customerPhone) return;
-    const msg = paymentReceivedMsg(
-      order.customerName || "Customer",
-      order.total,
-      shop?.shopName || "हमारी दुकान",
-      order.orderNumber || "",
-      method,
-      lang
-    );
-    window.open(waLink(order.customerPhone, msg), "_blank");
+    await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, method);
+
+    if (selectedOrder.customerPhone) {
+      const msg = paymentReceivedMsg(
+        selectedOrder.customerName || "Customer",
+        selectedOrder.total,
+        shop?.shopName || "हमारी दुकान",
+        selectedOrder.orderNumber || "",
+        method,
+        lang
+      );
+      window.open(waLink(selectedOrder.customerPhone, msg), "_blank");
+    }
+
+    await load(user.uid);
+    setSelectedOrder(null);
   }
 
   const filtered = orders.filter((o) => {
@@ -110,9 +95,7 @@ export default function OrdersPage() {
             key={f}
             onClick={() => setFilter(f)}
             className={`flex-1 py-2 rounded-xl text-xs font-bold hi transition-colors ${
-              filter === f
-                ? "bg-brand text-white"
-                : "bg-white text-slate-600 border"
+              filter === f ? "bg-brand text-white" : "bg-white text-slate-600 border"
             }`}
           >
             {f === "all" ? t(lang, "all") : f === "unpaid" ? t(lang, "unpaid") : t(lang, "paid")}
@@ -159,15 +142,22 @@ export default function OrdersPage() {
                   : t(lang, "udhaar")}
               </span>
             </div>
+
             <div className="flex items-center justify-between pt-2 border-t border-slate-100">
               <div className="text-lg font-extrabold text-brand">
                 ₹{Number(o.total || 0).toLocaleString("en-IN")}
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => router.push(`/dashboard/orders/${o.id}`)}
+                  className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"
+                >
+                  ✏️ Edit
+                </button>
                 {o.customerPhone && (
                   <button
                     onClick={() => {
-                      const msg = `Hello ${o.customerName || ""}! Your order: ${o.items}, Total: ₹${o.total}`;
+                      const msg = `Hello ${o.customerName || ""}! Order: ${o.items}, Total: ₹${o.total}`;
                       window.open(waLink(o.customerPhone, msg), "_blank");
                     }}
                     className="bg-green-50 text-green-700 px-2 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
@@ -201,13 +191,18 @@ export default function OrdersPage() {
                   <span className="text-xs text-slate-500">{selectedOrder.customerName}</span>
                 </div>
               </div>
-              <button onClick={() => { setShowPayModal(false); setSelectedOrder(null); }} className="p-1 text-slate-500">
+              <button
+                onClick={() => { setShowPayModal(false); setSelectedOrder(null); }}
+                className="p-1 text-slate-500"
+              >
                 <X size={22}/>
               </button>
             </div>
             <div className="space-y-3 mt-4">
-              <button onClick={() => confirmPayment("cash")}
-                className="w-full p-4 bg-green-50 active:bg-green-200 rounded-xl flex items-center gap-3">
+              <button
+                onClick={() => confirmPayment("cash")}
+                className="w-full p-4 bg-green-50 active:bg-green-200 rounded-xl flex items-center gap-3"
+              >
                 <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                   <Banknote size={24} className="text-white"/>
                 </div>
@@ -216,8 +211,10 @@ export default function OrdersPage() {
                   <div className="text-xs text-slate-500 hi">{t(lang, "cashSub")}</div>
                 </div>
               </button>
-              <button onClick={() => confirmPayment("upi")}
-                className="w-full p-4 bg-blue-50 active:bg-blue-200 rounded-xl flex items-center gap-3">
+              <button
+                onClick={() => confirmPayment("upi")}
+                className="w-full p-4 bg-blue-50 active:bg-blue-200 rounded-xl flex items-center gap-3"
+              >
                 <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                   <Smartphone size={24} className="text-white"/>
                 </div>
@@ -230,22 +227,6 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
-
-      {showUpiAlert && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl p-6 text-center">
-            <div className="w-14 h-14 bg-yellow-100 rounded-full mx-auto flex items-center justify-center mb-3">
-              <Smartphone size={28} className="text-yellow-600"/>
-            </div>
-            <h3 className="font-bold hi mb-1">{t(lang, "upiNotSet")}</h3>
-            <p className="text-sm text-slate-600 hi mb-4">{t(lang, "upiNotSetMsg")}</p>
-            <button onClick={() => setShowUpiAlert(false)}
-              className="w-full bg-brand text-white py-2.5 rounded-xl font-bold hi">
-              OK
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
-                  }
+              }
