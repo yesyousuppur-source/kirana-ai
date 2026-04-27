@@ -99,13 +99,18 @@ export default function EditOrderPage() {
     );
   }
 
+  // Cancelled order — sirf read-only view
+  const isCancelled = order?.status === "cancelled";
+
   return (
     <div className="min-h-screen bg-slate-50 max-w-3xl mx-auto pb-24">
       <header className="bg-brand text-white px-4 h-[60px] flex items-center gap-3 sticky top-0 z-20 shadow-md">
         <button onClick={() => router.back()} className="p-1">
           <ArrowLeft size={24} />
         </button>
-        <h1 className="font-bold text-lg hi flex-1">Order Edit करें</h1>
+        <h1 className="font-bold text-lg hi flex-1">
+          {isCancelled ? "Order Details" : "Order Edit करें"}
+        </h1>
         {order?.orderNumber && (
           <div className="bg-white/20 px-3 py-1 rounded-full text-xs font-bold">
             #{typeof order.orderNumber === "number"
@@ -116,6 +121,18 @@ export default function EditOrderPage() {
       </header>
 
       <div className="p-3 space-y-3">
+
+        {/* Cancelled Banner */}
+        {isCancelled && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
+            <X size={18} className="text-red-500 flex-shrink-0" />
+            <div>
+              <div className="font-bold text-red-600 hi">यह ऑर्डर कैंसल हो गया है</div>
+              <div className="text-xs text-red-400 hi">इसे edit नहीं किया जा सकता</div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
           <div className="text-xs text-blue-700 font-bold hi">ग्राहक</div>
           <div className="font-bold hi">{order?.customerName || "Customer"}</div>
@@ -124,86 +141,122 @@ export default function EditOrderPage() {
 
         <div className="bg-white rounded-xl p-3 shadow-sm">
           <div className="text-xs font-bold text-slate-600 hi mb-2">
-            {t(lang, "items")} *
+            {t(lang, "items")}
           </div>
           <textarea
             value={items}
-            onChange={(e) => setItems(e.target.value)}
+            onChange={(e) => !isCancelled && setItems(e.target.value)}
             placeholder={t(lang, "itemsPlaceholder")}
             rows="3"
-            className="w-full p-3 border rounded-lg outline-none focus:border-brand text-sm hi resize-none"
+            readOnly={isCancelled}
+            className={`w-full p-3 border rounded-lg outline-none text-sm hi resize-none ${
+              isCancelled ? "bg-slate-50 text-slate-400 line-through" : "focus:border-brand"
+            }`}
           />
         </div>
 
         <div className="bg-white rounded-xl p-3 shadow-sm">
           <div className="text-xs font-bold text-slate-600 hi mb-2">
-            {t(lang, "totalAmount")} *
+            {t(lang, "totalAmount")}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-extrabold text-brand">₹</span>
+            <span className={`text-2xl font-extrabold ${isCancelled ? "text-slate-300" : "text-brand"}`}>₹</span>
             <input
               type="tel"
               inputMode="numeric"
               value={total}
-              onChange={(e) => setTotal(e.target.value.replace(/\D/g, ""))}
+              readOnly={isCancelled}
+              onChange={(e) => !isCancelled && setTotal(e.target.value.replace(/\D/g, ""))}
               placeholder="0"
-              className="flex-1 text-2xl font-extrabold p-2 border rounded-lg outline-none focus:border-brand"
+              className={`flex-1 text-2xl font-extrabold p-2 border rounded-lg outline-none ${
+                isCancelled ? "bg-slate-50 text-slate-300 line-through" : "focus:border-brand"
+              }`}
             />
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="font-bold hi">{t(lang, "paymentDone")}</div>
-              <div className="text-xs text-slate-500 hi">
-                {paid ? t(lang, "paymentYes") : t(lang, "paymentNo")}
+        {/* ✅ TOGGLE FIX — overflow-hidden + proper sizing */}
+        {!isCancelled && (
+          <div className="bg-white rounded-xl p-3 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold hi">{t(lang, "paymentDone")}</div>
+                <div className="text-xs text-slate-500 hi">
+                  {paid ? t(lang, "paymentYes") : t(lang, "paymentNo")}
+                </div>
+              </div>
+              {/* Toggle Switch */}
+              <div
+                onClick={() => setPaid(!paid)}
+                className={`relative cursor-pointer flex-shrink-0 ${
+                  paid ? "bg-brand" : "bg-slate-300"
+                }`}
+                style={{
+                  width: 52,
+                  height: 30,
+                  borderRadius: 15,
+                  transition: "background-color 0.2s",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 3,
+                    left: paid ? 25 : 3,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 12,
+                    backgroundColor: "white",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                    transition: "left 0.2s",
+                  }}
+                />
               </div>
             </div>
-            <button
-              onClick={() => setPaid(!paid)}
-              className={`w-14 h-8 rounded-full transition-colors relative flex-shrink-0 ${paid ? "bg-brand" : "bg-slate-300"}`}
-            >
-              <span className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform shadow ${paid ? "translate-x-7" : "translate-x-1"}`}></span>
-            </button>
           </div>
-        </div>
+        )}
 
-        <div className="bg-white rounded-xl p-3 shadow-sm">
-          <label className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <div className="font-bold hi">{t(lang, "sendWAConfirm")}</div>
-              <div className="text-xs text-slate-500 hi">Updated order customer ko bhejein</div>
-            </div>
-            <input
-              type="checkbox"
-              checked={sendWA}
-              onChange={(e) => setSendWA(e.target.checked)}
-              className="w-5 h-5 accent-brand flex-shrink-0"
-            />
-          </label>
-        </div>
+        {!isCancelled && (
+          <div className="bg-white rounded-xl p-3 shadow-sm">
+            <label className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="font-bold hi">{t(lang, "sendWAConfirm")}</div>
+                <div className="text-xs text-slate-500 hi">Updated order customer ko bhejein</div>
+              </div>
+              <input
+                type="checkbox"
+                checked={sendWA}
+                onChange={(e) => setSendWA(e.target.checked)}
+                className="w-5 h-5 accent-brand flex-shrink-0"
+              />
+            </label>
+          </div>
+        )}
 
-        {/* Cancel Button */}
-        <button
-          onClick={() => setShowCancelConfirm(true)}
-          className="w-full bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl font-bold hi flex items-center justify-center gap-2 active:bg-red-100"
-        >
-          <X size={18} /> ऑर्डर कैंसल करें
-        </button>
+        {/* Cancel Button — sirf active orders pe */}
+        {!isCancelled && (
+          <button
+            onClick={() => setShowCancelConfirm(true)}
+            className="w-full bg-red-50 text-red-600 border border-red-200 py-3 rounded-xl font-bold hi flex items-center justify-center gap-2 active:bg-red-100"
+          >
+            <X size={18} /> ऑर्डर कैंसल करें
+          </button>
+        )}
       </div>
 
-      {/* Save Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 max-w-3xl mx-auto">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full bg-brand text-white py-3.5 rounded-xl font-bold hi text-base active:bg-brand-dark disabled:opacity-50 flex items-center justify-center gap-2"
-        >
-          <Check size={20} strokeWidth={3} />
-          {saving ? "सेव हो रहा है..." : "बदलाव सेव करें"}
-        </button>
-      </div>
+      {/* Save Button — sirf active orders pe */}
+      {!isCancelled && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-3 max-w-3xl mx-auto">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full bg-brand text-white py-3.5 rounded-xl font-bold hi text-base active:bg-brand-dark disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <Check size={20} strokeWidth={3} />
+            {saving ? "सेव हो रहा है..." : "बदलाव सेव करें"}
+          </button>
+        </div>
+      )}
 
       {/* Cancel Confirm Modal */}
       {showCancelConfirm && (
@@ -214,7 +267,7 @@ export default function EditOrderPage() {
             </div>
             <h3 className="font-bold text-lg hi mb-1">ऑर्डर कैंसल करें?</h3>
             <p className="text-sm text-slate-600 hi mb-2">
-              {order?.customerName} का यह ऑर्डर हट जाएगा।
+              {order?.customerName} का यह ऑर्डर कैंसल हो जाएगा।
             </p>
             {!order?.paid && (
               <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 mb-2 hi">
@@ -241,4 +294,4 @@ export default function EditOrderPage() {
       )}
     </div>
   );
-}
+    }
