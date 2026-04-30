@@ -27,11 +27,9 @@ export default function CustomerLedgerPage() {
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState("hi");
 
-  // Order paid modal
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
-  // Partial payment modal
   const [showPartialModal, setShowPartialModal] = useState(false);
   const [partialAmount, setPartialAmount] = useState("");
   const [partialMethod, setPartialMethod] = useState("cash");
@@ -75,7 +73,6 @@ export default function CustomerLedgerPage() {
     setLoading(false);
   }
 
-  // Order-level paid modal
   function openPaymentModal(order) {
     setSelectedOrder(order);
     setShowPayModal(true);
@@ -103,7 +100,6 @@ export default function CustomerLedgerPage() {
     setSelectedOrder(null);
   }
 
-  // Partial payment submit
   async function handlePartialPayment() {
     const amt = Number(partialAmount);
     if (!amt || amt <= 0) { alert("सही amount डालें"); return; }
@@ -121,8 +117,7 @@ export default function CustomerLedgerPage() {
           note: `Payment ${customer.name}`,
         });
       }
-      await addPayment(user.uid, customerId, amt, partialMethod);
-      // WhatsApp receipt
+      await addPayment(user.uid, customerId, amt);
       const date = new Date().toLocaleDateString("en-IN", {
         day: "numeric", month: "short", year: "numeric"
       });
@@ -139,6 +134,7 @@ export default function CustomerLedgerPage() {
     }
     setSavingPartial(false);
   }
+
   function sendReminder() {
     if (!customer.udhaar || customer.udhaar <= 0) {
       alert(t(lang, "noUdhaar"));
@@ -176,9 +172,8 @@ export default function CustomerLedgerPage() {
   const init = (customer.name || "?")
     .split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
-  const totalPaid = orders
-    .filter((o) => o.paid)
-    .reduce((s, o) => s + Number(o.total || 0), 0);
+  // ✅ FIX — totalPaid from customer doc (includes partial payments)
+  const totalPaid = customer.totalPaid || 0;
 
   return (
     <div className="min-h-screen bg-slate-50 max-w-3xl mx-auto pb-20">
@@ -221,7 +216,6 @@ export default function CustomerLedgerPage() {
         </div>
       </div>
 
-      {/* Action Buttons */}
       <div className="px-3 py-3 sticky top-[60px] bg-slate-50 z-10 flex gap-2">
         <button
           onClick={sendReminder}
@@ -239,7 +233,8 @@ export default function CustomerLedgerPage() {
           </button>
         )}
       </div>
-<div className="px-3">
+
+      <div className="px-3">
         {orders.length === 0 ? (
           <div className="text-center py-16">
             <ShoppingBag size={48} className="mx-auto text-slate-300 mb-3" />
@@ -333,7 +328,6 @@ export default function CustomerLedgerPage() {
         )}
       </div>
 
-      {/* Order Paid Modal */}
       {showPayModal && selectedOrder && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6">
@@ -374,7 +368,6 @@ export default function CustomerLedgerPage() {
         </div>
       )}
 
-      {/* Partial Payment Modal */}
       {showPartialModal && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6">
@@ -389,7 +382,6 @@ export default function CustomerLedgerPage() {
                 <X size={22}/>
               </button>
             </div>
-
             <div className="mb-4">
               <div className="text-xs font-bold text-slate-600 hi mb-2">कितना पैसा मिला? *</div>
               <div className="flex items-center gap-2 border rounded-xl p-3 focus-within:border-brand">
@@ -410,7 +402,6 @@ export default function CustomerLedgerPage() {
                 </p>
               )}
             </div>
-
             <div className="text-xs font-bold text-slate-600 hi mb-2">Payment Method</div>
             <div className="flex gap-2 mb-5">
               <button
@@ -430,7 +421,6 @@ export default function CustomerLedgerPage() {
                 <Smartphone size={18}/> UPI
               </button>
             </div>
-
             <button
               onClick={handlePartialPayment}
               disabled={savingPartial || !partialAmount || Number(partialAmount) <= 0}
@@ -444,4 +434,4 @@ export default function CustomerLedgerPage() {
       )}
     </div>
   );
-            }
+}
