@@ -4,14 +4,15 @@ import { useRouter, useParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import {
-  getShop, getCustomer, getCustomerOrders, markOrderPaid,
+  getShop, getCustomer, getCustomerOrders,
+  markOrderPaid, addPayment,
 } from "@/lib/store";
 import { waLink, paymentReminderMsg, paymentReceivedMsg } from "@/lib/whatsapp";
 import { openUpiApp } from "@/lib/upi";
 import { t, getSavedLang } from "@/lib/i18n";
 import {
   ArrowLeft, Phone, MessageCircle, Check,
-  Calendar, ShoppingBag, Banknote, Smartphone, X, Hash,
+  Calendar, ShoppingBag, Banknote, Smartphone, X, Hash, IndianRupee,
 } from "lucide-react";
 
 export default function CustomerLedgerPage() {
@@ -25,8 +26,16 @@ export default function CustomerLedgerPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState("hi");
+
+  // Order paid modal
   const [showPayModal, setShowPayModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+
+  // Partial payment modal
+  const [showPartialModal, setShowPartialModal] = useState(false);
+  const [partialAmount, setPartialAmount] = useState("");
+  const [partialMethod, setPartialMethod] = useState("cash");
+  const [savingPartial, setSavingPartial] = useState(false);
 
   useEffect(() => {
     setLang(getSavedLang());
@@ -66,16 +75,15 @@ export default function CustomerLedgerPage() {
     setLoading(false);
   }
 
+  // Order-level paid modal
   function openPaymentModal(order) {
     setSelectedOrder(order);
     setShowPayModal(true);
   }
 
-  async function confirmPayment(method) {
+  async function confirmOrderPayment(method) {
     if (!selectedOrder) return;
     setShowPayModal(false);
-
-    // UPI — agar ID set hai toh app kholo, warna sirf paid mark karo
     if (method === "upi" && shop?.upiId) {
       openUpiApp({
         upiId: shop.upiId,
@@ -84,26 +92,53 @@ export default function CustomerLedgerPage() {
         note: `${selectedOrder.orderNumber || ""} ${customer.name}`,
       });
     }
-
-    // Dono cases me — turant paid mark karo
     await markOrderPaid(user.uid, selectedOrder.id, selectedOrder, method);
-    await sendReceipt(selectedOrder, method);
+    const msg = paymentReceivedMsg(
+      customer.name, selectedOrder.total,
+      shop?.shopName || "हमारी दुकान",
+      selectedOrder.orderNumber || "", method, lang
+    );
+    if (customer.phone) window.open(waLink(customer.phone, msg), "_blank");
     await load(user.uid);
     setSelectedOrder(null);
   }
-  async function sendReceipt(order, method) {
-    if (!customer.phone) return;
-    const msg = paymentReceivedMsg(
-      customer.name,
-      order.total,
-      shop?.shopName || "हमारी दुकान",
-      order.orderNumber || "",
-      method,
-      lang
-    );
-    window.open(waLink(customer.phone, msg), "_blank");
-  }
 
+  // Partial payment submit
+  async function handlePartialPayment() {
+    const amt = Number(partialAmount);
+    if (!amt || amt <= 0) { alert("सही amount डालें"); return; }
+    if (amt > (customer.udhaar || 0)) {
+      alert(`Amount ₹${customer.udhaar} से ज्यादा नहीं हो सकता`);
+      return;
+    }
+    setSavingPartial(true);
+    try {
+      if (partialMethod === "upi" && shop?.upiId) {
+        openUpiApp({
+          upiId: shop.upiId,
+          payeeName: shop.shopName || "Shop",
+          amount: amt,
+          note: `Payment ${customer.name}`,
+        });
+      }
+      await addPayment(user.uid, customerId, amt, partialMethod);
+      // WhatsApp receipt
+      const date = new Date().toLocaleDateString("en-IN", {
+        day: "numeric", month: "short", year: "numeric"
+      });
+      const methodText = partialMethod === "upi" ? "UPI" : "Cash";
+      const msg = `✅ Payment Received\n\nCustomer: ${customer.name}\nAmount: ₹${amt}\nMethod: ${methodText}\nDate: ${date}\n\nBaaki: ₹${Math.max(0, (customer.udhaar || 0) - amt)}\n\nDhanyavad! 🙏\n- ${shop?.shopName || "हमारी दुकान"}\n🌐 www.kiranaai.shop`;
+      if (customer.phone) window.open(waLink(customer.phone, msg), "_blank");
+      setShowPartialModal(false);
+      setPartialAmount("");
+      setPartialMethod("cash");
+      await load(user.uid);
+    } catch (e) {
+      console.error(e);
+      alert("Payment save failed. Try again.");
+    }
+    setSavingPartial(false);
+  }
   function sendReminder() {
     if (!customer.udhaar || customer.udhaar <= 0) {
       alert(t(lang, "noUdhaar"));
@@ -186,14 +221,23 @@ export default function CustomerLedgerPage() {
         </div>
       </div>
 
-      <div className="px-3 py-3 sticky top-[60px] bg-slate-50 z-10">
+      {/* Action Buttons */}
+      <div className="px-3 py-3 sticky top-[60px] bg-slate-50 z-10 flex gap-2">
         <button
           onClick={sendReminder}
           disabled={!customer.udhaar || customer.udhaar <= 0}
-          className="w-full bg-green-50 text-green-700 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 active:bg-green-100 disabled:opacity-40 hi"
+          className="flex-1 bg-green-50 text-green-700 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 active:bg-green-100 disabled:opacity-40 hi"
         >
           <MessageCircle size={16} /> {t(lang, "reminder")}
         </button>
+        {customer.udhaar > 0 && (
+          <button
+            onClick={() => { setPartialAmount(""); setShowPartialModal(true); }}
+            className="flex-1 bg-blue-50 text-blue-700 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 active:bg-blue-100 hi"
+          >
+            <IndianRupee size={16} /> Payment Mila
+          </button>
+        )}
       </div>
 <div className="px-3">
         {orders.length === 0 ? (
@@ -215,7 +259,12 @@ export default function CustomerLedgerPage() {
               </div>
               <div className="space-y-2">
                 {dayOrders.map((o) => (
-                  <div key={o.id} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100">
+                  <div key={o.id} className={`bg-white rounded-xl p-3 shadow-sm border ${o.status === "cancelled" ? "border-red-200 opacity-70" : "border-slate-100"}`}>
+                    {o.status === "cancelled" && (
+                      <div className="bg-red-50 text-red-600 text-[11px] font-bold px-2 py-1 rounded-lg mb-2">
+                        ❌ कैंसल हो गया
+                      </div>
+                    )}
                     <div className="flex items-start justify-between mb-1.5 gap-2">
                       <div className="flex-1 min-w-0">
                         {o.orderNumber && (
@@ -226,23 +275,27 @@ export default function CustomerLedgerPage() {
                               : o.orderNumber}
                           </div>
                         )}
-                        <div className="text-sm hi">{o.items || "Order"}</div>
+                        <div className={`text-sm hi ${o.status === "cancelled" ? "line-through text-slate-400" : ""}`}>
+                          {o.items || "Order"}
+                        </div>
                       </div>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                        o.paid
-                          ? o.paymentMethod === "upi"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800"
-                          : "bg-yellow-100 text-yellow-800"
+                        o.status === "cancelled"
+                          ? "bg-red-100 text-red-700"
+                          : o.paid
+                            ? o.paymentMethod === "upi"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                            : "bg-yellow-100 text-yellow-800"
                       }`}>
-                        {o.paid
-                          ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}`
-                          : t(lang, "udhaar")}
+                        {o.status === "cancelled" ? "❌ Cancel" :
+                          o.paid ? `✓ ${o.paymentMethod === "upi" ? "UPI" : "Cash"}` :
+                          t(lang, "udhaar")}
                       </span>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
                       <div>
-                        <div className="text-lg font-extrabold text-brand">
+                        <div className={`text-lg font-extrabold ${o.status === "cancelled" ? "text-slate-300 line-through" : "text-brand"}`}>
                           ₹{Number(o.total || 0).toLocaleString("en-IN")}
                         </div>
                         <div className="text-[10px] text-slate-400">
@@ -253,22 +306,24 @@ export default function CustomerLedgerPage() {
                             : ""}
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => router.push(`/dashboard/orders/${o.id}`)}
-                          className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold"
-                        >
-                          ✏️ Edit
-                        </button>
-                        {!o.paid && (
+                      {o.status !== "cancelled" && (
+                        <div className="flex gap-2">
                           <button
-                            onClick={() => openPaymentModal(o)}
-                            className="bg-brand text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                            onClick={() => router.push(`/dashboard/orders/${o.id}`)}
+                            className="bg-slate-100 text-slate-700 px-2 py-1.5 rounded-lg text-xs font-bold"
                           >
-                            <Check size={12} /> {t(lang, "paid")}
+                            ✏️
                           </button>
-                        )}
-                      </div>
+                          {!o.paid && (
+                            <button
+                              onClick={() => openPaymentModal(o)}
+                              className="bg-brand text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"
+                            >
+                              <Check size={12} /> {t(lang, "paid")}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -278,29 +333,24 @@ export default function CustomerLedgerPage() {
         )}
       </div>
 
+      {/* Order Paid Modal */}
       {showPayModal && selectedOrder && (
         <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
           <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6">
             <div className="flex items-start justify-between mb-4">
               <div className="flex-1">
                 <h2 className="text-xl font-bold hi">{t(lang, "paymentMethod")}</h2>
-                <p className="text-sm text-slate-500 hi mt-1">{t(lang, "paymentMethodSub")}</p>
                 <div className="mt-2 bg-slate-100 px-3 py-1.5 rounded-lg inline-flex gap-2 items-center">
                   <span className="font-bold">₹{selectedOrder.total}</span>
                 </div>
               </div>
-              <button
-                onClick={() => { setShowPayModal(false); setSelectedOrder(null); }}
-                className="p-1 text-slate-500"
-              >
+              <button onClick={() => { setShowPayModal(false); setSelectedOrder(null); }} className="p-1 text-slate-500">
                 <X size={22}/>
               </button>
             </div>
             <div className="space-y-3 mt-4">
-              <button
-                onClick={() => confirmPayment("cash")}
-                className="w-full p-4 bg-green-50 active:bg-green-200 rounded-xl flex items-center gap-3"
-              >
+              <button onClick={() => confirmOrderPayment("cash")}
+                className="w-full p-4 bg-green-50 active:bg-green-200 rounded-xl flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                   <Banknote size={24} className="text-white"/>
                 </div>
@@ -309,10 +359,8 @@ export default function CustomerLedgerPage() {
                   <div className="text-xs text-slate-500 hi">{t(lang, "cashSub")}</div>
                 </div>
               </button>
-              <button
-                onClick={() => confirmPayment("upi")}
-                className="w-full p-4 bg-blue-50 active:bg-blue-200 rounded-xl flex items-center gap-3"
-              >
+              <button onClick={() => confirmOrderPayment("upi")}
+                className="w-full p-4 bg-blue-50 active:bg-blue-200 rounded-xl flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                   <Smartphone size={24} className="text-white"/>
                 </div>
@@ -322,6 +370,75 @@ export default function CustomerLedgerPage() {
                 </div>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partial Payment Modal */}
+      {showPartialModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-3xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold hi">💰 Payment Mila</h2>
+                <p className="text-sm text-slate-500 hi mt-1">
+                  कुल बाकी: ₹{(customer.udhaar || 0).toLocaleString("en-IN")}
+                </p>
+              </div>
+              <button onClick={() => setShowPartialModal(false)} className="p-1 text-slate-500">
+                <X size={22}/>
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <div className="text-xs font-bold text-slate-600 hi mb-2">कितना पैसा मिला? *</div>
+              <div className="flex items-center gap-2 border rounded-xl p-3 focus-within:border-brand">
+                <span className="text-2xl font-extrabold text-brand">₹</span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={partialAmount}
+                  onChange={(e) => setPartialAmount(e.target.value.replace(/\D/g, ""))}
+                  placeholder="0"
+                  className="flex-1 text-2xl font-extrabold outline-none"
+                  autoFocus
+                />
+              </div>
+              {partialAmount && Number(partialAmount) > 0 && (
+                <p className="text-xs text-slate-500 hi mt-2">
+                  Payment ke baad baaki: ₹{Math.max(0, (customer.udhaar || 0) - Number(partialAmount)).toLocaleString("en-IN")}
+                </p>
+              )}
+            </div>
+
+            <div className="text-xs font-bold text-slate-600 hi mb-2">Payment Method</div>
+            <div className="flex gap-2 mb-5">
+              <button
+                onClick={() => setPartialMethod("cash")}
+                className={`flex-1 p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm border-2 transition-colors ${
+                  partialMethod === "cash" ? "border-green-500 bg-green-50 text-green-700" : "border-slate-200 text-slate-600"
+                }`}
+              >
+                <Banknote size={18}/> Cash
+              </button>
+              <button
+                onClick={() => setPartialMethod("upi")}
+                className={`flex-1 p-3 rounded-xl flex items-center justify-center gap-2 font-bold text-sm border-2 transition-colors ${
+                  partialMethod === "upi" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600"
+                }`}
+              >
+                <Smartphone size={18}/> UPI
+              </button>
+            </div>
+
+            <button
+              onClick={handlePartialPayment}
+              disabled={savingPartial || !partialAmount || Number(partialAmount) <= 0}
+              className="w-full bg-brand text-white py-3.5 rounded-xl font-bold hi text-base disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <Check size={20} strokeWidth={3}/>
+              {savingPartial ? "सेव हो रहा है..." : `₹${partialAmount || 0} Received ✓`}
+            </button>
           </div>
         </div>
       )}
